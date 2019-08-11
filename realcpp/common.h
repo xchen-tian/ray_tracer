@@ -5,6 +5,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <iostream>
+#include <random>
 
 class Vec3 {
 
@@ -167,9 +168,10 @@ inline Vec3 Vec3::project_on_unit(Vec3 vec) const {
 	return x;
 }
 
-
 struct Sphere {
 	Vec3 center;
 	float radius;
 	Sphere(const Vec3&center, const float & radius):center(center),radius(radius) {}
 };
+
+float rand_next();

@@ -3,17 +3,23 @@
 
 #include "pch.h"
 #include "common.h"
+#include "material.h"
+#include "ray.h"
+#include "objects.h"
 #include <iostream>
 #include <fstream>
 #include <vector>
 #include <random>
+#include <omp.h>
+
 
 using namespace std;
 
 Vec3 origin(.0f, .0f, .0f);
+Vec3 white(1.0f, 1.0f, 1.0f);
 Vec3 red(.9f, .0f, .0f);
 
-vector<Sphere> spheres;
+vector<Object> objs;
 
 Vec3 background(float y) {
 	const Vec3 top(0.5, 0.6, 0.8);
@@ -26,71 +32,72 @@ Vec3 normal_color(const Vec3 & v) {
 	return 0.5 * (v.to_unit_vector() + 1.0f);
 }
 
-struct HitRecord {
-	float t; // the time of ray hits align the direction
-	Vec3 hit_point;
-	Vec3 normal;
-};
 
-struct Ray {
-	Vec3 from;
-	Vec3 direction;
 
-	Ray(const Vec3 & from, const Vec3 & direction): from(from), direction(direction.to_unit_vector()){}
-	Ray() {}
+bool hit_test(const Ray & ray, HitRecord& record, Object& objs) {
+	//1. project vector from ---> center to ray's direction
+	//2. get perpendicular line length
+	//3. compare it with radius
+	//4. to get time t, need to get perpendicular point to hit point position (secant).
+	//5. t = origin length - secant length (half)
+	auto t1 = objs.sphere.center - ray.from;
+	bool hit = false;
 
-	Vec3 point_at(float t) {
-		return t * direction + from;
+	auto proj = t1.project_on_unit(ray.direction); // projection
+	auto perpen = t1 - proj;
+	hit = perpen.squared_length() < objs.sphere.radius * objs.sphere.radius;
+	// positive angle < 90 degree
+	if (t1.dot(ray.direction) < 0.0f) {
+		hit = false;
 	}
-
-	bool hit(HitRecord & record, Sphere & sphere) {
-		//1. project vector from ---> center to ray's direction
-		//2. get perpendicular line length
-		//3. compare it with radius
-		//4. to get time t, need to get perpendicular point to hit point position (secant).
-		//5. t = origin length - secant length (half)
-		auto t1 = sphere.center - this->from;
-		bool hit = false;
-
-		auto proj = t1.project_on_unit(this->direction); // projection
-		auto perpen = t1 - proj;
-		hit = perpen.squared_length() < sphere.radius *sphere.radius;
-		// positive angle < 90 degree
-		if (t1.dot(direction) < 0.0f) {
-			hit = false;
-		}
-		if (hit) {
-			const auto r = sphere.radius;
-			auto secant_length_half = sqrt(r*r - perpen.squared_length());
-			float t = proj.length() - secant_length_half;
-			record.hit_point = this->point_at(t);
-			record.t = t;
-			record.normal = - t1 + (record.hit_point - from);
-			record.normal.make_unit_vector();
-		}
-		return hit;
-
+	if (hit) {
+		const auto r = objs.sphere.radius;
+		auto secant_length_half = sqrt(r * r - perpen.squared_length());
+		float t = proj.length() - secant_length_half;
+		record.hit_point = ray.point_at(t);
+		record.t = t;
+		record.normal = -t1 + (record.hit_point - ray.from);
+		record.normal.make_unit_vector();
 	}
+	return hit;
 
-};
+}
 
-Vec3 render(Ray &ray) {
-	// intersect with sphere
+Vec3 render(Ray &ray,int depth) {
+	// intersect with sphere closest
 
-	for (auto i : spheres) {
+	HitRecord record2;
+	bool hit = false;
+	Object* p = nullptr;
+	for (auto & i : objs) { // has to be reference
 		HitRecord record;
-		if (ray.hit(record,i)) {
+		if (hit_test(ray,record,i)) {
+			if (!hit) {
+				record2 = record;
+				hit = true;
+				p = &i;
+			}
+			else if (record.t < record2.t) {
+				record2 = record;
+				p = &i;
+			}
 			//cout << ray.direction << endl;
-			auto newray = Ray();
-			//TODO -------------------------------- here
-
 			//return normal_color(record.normal);
 			//return red;
 		}
 	}
 
+	if (hit) {
+		Ray ray_out;
+		Vec3 decay;
+		//cout <<  *(p->material) << endl;
+		p->material->scatter(ray, record2, decay, ray_out);
+		return decay * render(ray_out, depth + 1);
+	}
+
 	//render background
 	return background(ray.direction.y());
+
 }
 
 inline int colorint(float f) {
@@ -99,14 +106,39 @@ inline int colorint(float f) {
 
 void create_scene1() {
 	//Sphere s1 = Sphere({1,1,4},1.07);
-	Sphere s1 = Sphere({ 0.5,0,6 }, 3);
-	Sphere ground = Sphere({ 0,400.5,10 }, 400);
-	spheres.push_back(s1);
-	spheres.push_back(ground);
+	//Sphere s1 = Sphere({ 15.5, 0, 9 }, 3);
+	Sphere s1 = Sphere({ 0, 0, 5 }, 2);
+	Sphere ground = Sphere({ 0,-400.05 - 2,5 }, 400);
+	//spheres.push_back(s1);
+	//spheres.push_back(ground);
 }
 
+void create_scene2() {
+	Material* mred = new Lambertian({ 0.8, 0.3, 0.2 }); // red
+	Material* mgreen = new Lambertian({ 0.3, 0.8, 0.2 }); // green
+	Material* mgrey = new Lambertian({ 0.5, 0.5, 0.5 }); // grey
+
+	Material* silver = new Metal({ 0.9, 0.9, 0.9 },0.0); // silver
+	Material* gold = new Metal({ 0.7, 0.6, 0.2 }, 0.0); // gold
+
+	Material* iron = new Metal({ 0.8, 0.8, 0.9 }, 0.2); // iron
+
+	Sphere s1 = Sphere({ 0, 0, 5 }, 2);
+	Sphere s2 = Sphere({ 5, 0, 5 }, 2);
+	Sphere s3 = Sphere({ -4, 0, 5 }, 2);
+	Sphere ground = Sphere({ 0,-400.05 - 2,5 }, 400);
+
+	objs = {
+		Object(s1,iron),
+		Object(s2,silver),
+		Object(s3,gold),
+		Object(ground,mgrey)
+	};
+}
+
+
 void work() {
-	create_scene1();
+	create_scene2();
 	Vec3 screen_top   (0,  1, 0);
 	Vec3 screen_bottom(0, -1, 0);
 	Vec3 screen_left  (-2,  0, 0);
@@ -115,12 +147,8 @@ void work() {
 	//int resolution_h = 100;
 	//int resolution_w = 200;
 
-	int resolution_h = 300;
-	int resolution_w = 600;
-
-	std::random_device dev;
-	std::mt19937 rng(dev());
-	uniform_real_distribution<float> rand_gen(-0.5f, 0.5f);
+	int resolution_h = 300 * 2;
+	int resolution_w = 600 * 2;
 
 	ofstream fout;
 	ofstream txtout;
@@ -129,19 +157,21 @@ void work() {
 	fout << "P3" << endl;
 	fout << resolution_w <<" " << resolution_h << endl;
 	fout << 255 << endl;
+
+	//#pragma omp parallel for
 	for (int h = 0; h < resolution_h; h++) {
 		for (int w = 0; w < resolution_w; w++) {
 			
 			Vec3 color{0,0,0};
-			const int sample_num = 20;
+			const int sample_num = 150;
 			for (int sample = 0; sample < sample_num; sample ++) {
-				float rh = (h + rand_gen(rng)) * 1.0 / resolution_h;
-				float rw = (w + rand_gen(rng)) * 1.0 / resolution_w;
+				float rh = (h + rand_next()) * 1.0 / resolution_h;
+				float rw = (w + rand_next()) * 1.0 / resolution_w;
 				Vec3 to = (1 - rw) * screen_left + rw * screen_right +
-					(1 - rh) * screen_top + rh * screen_bottom + screen_z;
+					(1 - rh)*screen_top + rh* screen_bottom + screen_z;
 
 				Ray ray(origin, to);
-				Vec3 colorx = render(ray);
+				Vec3 colorx = render(ray,0);
 				color += colorx;
 			}
 			color /= 1.0 * sample_num;
