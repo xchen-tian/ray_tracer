@@ -35,6 +35,8 @@ Vec3 normal_color(const Vec3 & v) {
 
 
 bool hit_test(const Ray & ray, HitRecord& record, Object& objs) {
+	const float T_MIN = 1e-9;
+	const float T_MAX = 1e20;
 	//1. project vector from ---> center to ray's direction
 	//2. get perpendicular line length
 	//3. compare it with radius
@@ -54,6 +56,9 @@ bool hit_test(const Ray & ray, HitRecord& record, Object& objs) {
 		const auto r = objs.sphere.radius;
 		auto secant_length_half = sqrt(r * r - perpen.squared_length());
 		float t = proj.length() - secant_length_half;
+		if (!(T_MIN <= t)) {
+			return false;
+		}
 		record.hit_point = ray.point_at(t);
 		record.t = t;
 		record.normal = -t1 + (record.hit_point - ray.from);
@@ -90,7 +95,7 @@ Vec3 render(Ray &ray,int depth) {
 	if (hit) {
 		Ray ray_out;
 		Vec3 decay;
-		//cout <<  *(p->material) << endl;
+		//cout <<  *(p->material) << " "<<record2.hit_point<<" "<< record2.t  << endl;
 		p->material->scatter(ray, record2, decay, ray_out);
 		return decay * render(ray_out, depth + 1);
 	}
@@ -113,15 +118,17 @@ void create_scene1() {
 	//spheres.push_back(ground);
 }
 
+Material* mred = new Lambertian({ 0.8, 0.3, 0.2 }); // red
+Material* mgreen = new Lambertian({ 0.3, 0.8, 0.2 }); // green
+Material* mgrey = new Lambertian({ 0.5, 0.5, 0.5 }); // grey
+
+Material* silver = new Metal({ 0.9, 0.9, 0.9 }, 0.0); // silver
+Material* gold = new Metal({ 0.7, 0.6, 0.2 }, 0.0); // gold
+
+Material* iron = new Metal({ 0.8, 0.8, 0.9 }, 0.2); // iron
+Material* glass = new Glass({ 1.0, 1.0, 1.0 }, 0.0, 1.5); // iron
+
 void create_scene2() {
-	Material* mred = new Lambertian({ 0.8, 0.3, 0.2 }); // red
-	Material* mgreen = new Lambertian({ 0.3, 0.8, 0.2 }); // green
-	Material* mgrey = new Lambertian({ 0.5, 0.5, 0.5 }); // grey
-
-	Material* silver = new Metal({ 0.9, 0.9, 0.9 },0.0); // silver
-	Material* gold = new Metal({ 0.7, 0.6, 0.2 }, 0.0); // gold
-
-	Material* iron = new Metal({ 0.8, 0.8, 0.9 }, 0.2); // iron
 
 	Sphere s1 = Sphere({ 0, 0, 5 }, 2);
 	Sphere s2 = Sphere({ 5, 0, 5 }, 2);
@@ -136,19 +143,51 @@ void create_scene2() {
 	};
 }
 
+void create_scene_glass_ball() {
+
+	Sphere s1 = Sphere({ 0, -0.2, 4 }, 1.5);
+	Sphere s2 = Sphere({ 2.5, 0, 8 }, 2);
+	Sphere s3 = Sphere({ -2.5, 0, 6 }, 2);
+	Sphere ground = Sphere({ 0,-400.05 - 2,5 }, 400);
+
+	objs = {
+		Object(s1,glass),
+		Object(s2,mred),
+		//Object(s3,mgreen),
+		Object(ground,mgrey)
+	};
+}
+
+void intersection_check() {
+	int n = objs.size();
+	for (int i = 0; i < n; i++) {
+		for (int j = 0; j < i; j++) {
+			auto& s1 = objs[i].sphere;
+			auto& s2 = objs[j].sphere;
+			float l = (s1.center - s2.center).length();
+			bool intersect = l < (s1.radius + s2.radius);
+			if (intersect) {
+				cout << i << " intersect with " << j << endl;
+			}
+		}
+	}
+}
 
 void work() {
-	create_scene2();
+	//create_scene2();
+	create_scene_glass_ball();
 	Vec3 screen_top   (0,  1, 0);
 	Vec3 screen_bottom(0, -1, 0);
 	Vec3 screen_left  (-2,  0, 0);
 	Vec3 screen_right (2, 0, 0);
 	Vec3 screen_z (0, 0, 1);
-	//int resolution_h = 100;
-	//int resolution_w = 200;
+	int resolution_h = 300;
+	int resolution_w = 600;
 
-	int resolution_h = 300 * 2;
-	int resolution_w = 600 * 2;
+	intersection_check();
+
+	resolution_h = 300 * 2;
+	resolution_w = 600 * 2;
 
 	ofstream fout;
 	ofstream txtout;
@@ -163,7 +202,8 @@ void work() {
 		for (int w = 0; w < resolution_w; w++) {
 			
 			Vec3 color{0,0,0};
-			const int sample_num = 150;
+			//const int sample_num = 150;
+			const int sample_num = 50;
 			for (int sample = 0; sample < sample_num; sample ++) {
 				float rh = (h + rand_next()) * 1.0 / resolution_h;
 				float rw = (w + rand_next()) * 1.0 / resolution_w;
@@ -187,15 +227,3 @@ int main()
 {
 	work();
 }
-
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
-
-// Tips for Getting Started: 
-//   1. Use the Solution Explorer window to add/manage files
-//   2. Use the Team Explorer window to connect to source control
-//   3. Use the Output window to see build output and other messages
-//   4. Use the Error List window to view errors
-//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file
-
