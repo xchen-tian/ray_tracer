@@ -171,6 +171,7 @@ inline Vec3 Vec3::project_on_unit(Vec3 vec) const {
 struct Sphere {
 	Vec3 center;
 	float radius;
+	Sphere() {}
 	Sphere(const Vec3&center, const float & radius):center(center),radius(radius) {}
 };
 

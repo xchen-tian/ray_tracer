@@ -100,26 +100,29 @@ struct Glass:public Material {
 
 	inline bool refract(const Ray& ray_in, const Vec3 & normal, Vec3& out_direction) const{
 		bool from_medium = ray_in.direction.dot(normal) > 0;
-		auto neg_normal = -normal;
 		float n1, n2;
 		float sign = 1.0f; // control direction of normal 
 		if (from_medium) {
 			n1 = this->ri;
 			n2 = 1.0f;
-			float sign = -1.0f;
-			cout << "from_medium" << endl;
+			sign = -1.0f;
+			//cout << "from_medium" << endl;
 		}
 		else {
 			n1 = 1.0f;
 			n2 = this->ri;
 		}
+		auto neg_normal = - sign * normal;
+
 		Vec3 vertical = ray_in.direction - ray_in.direction.project_on_unit(neg_normal);
 		float sin_t1 = vertical.length() ; // Hypotenuse length = 1
 		auto sin_t2 = n1 / n2 * sin_t1;
+		if (sin_t2 > 1.0) { // total internal reflection
+			return false;
+		}
 		// sin_t2 possibly > 1 TODO
 		auto vertical2 = sin_t2;
 		float cosine = sqrt(1 - vertical2 * vertical2);
-		// cosine < 0 ?
 		Vec3 dir_out = sin_t2 * vertical.to_unit_vector()
 			+ cosine * neg_normal;
 		out_direction = dir_out.to_unit_vector();
@@ -145,6 +148,11 @@ struct Glass:public Material {
 		}
 		else {
 			//TODO add fuzz
+			if (this->fuzz > 0) {
+				auto& direction = ray_out.direction;
+				direction = (1 - fuzz) * direction
+					+ fuzz * this->random_ray_direction(record.normal);
+			}
 		}
 	}
 
