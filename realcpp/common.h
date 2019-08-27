@@ -6,6 +6,10 @@
 #include <stdlib.h>
 #include <iostream>
 #include <random>
+#include <algorithm>
+
+
+using namespace std;
 
 class Vec3 {
 
@@ -46,6 +50,14 @@ public:
 	//vec has to be unit vector
 	inline Vec3 project_on_unit(Vec3 vec) const;
 
+	inline Vec3 minvec(const Vec3 & vec) const {
+		return { min(e[0],vec.e[0]), min(e[1],vec.e[1]), min(e[2],vec.e[2]) };
+	}
+
+	inline Vec3 maxvec(const Vec3 & vec) const {
+		return { max(e[0],vec.e[0]), max(e[1],vec.e[1]), max(e[2],vec.e[2]) };
+	}
+
 	float e[3];
 };
 
@@ -82,6 +94,10 @@ inline Vec3 operator+(const Vec3 &v1, const float & v) {
 
 inline Vec3 operator-(const Vec3 &v1, const Vec3 &v2) {
 	return Vec3(v1.e[0] - v2.e[0], v1.e[1] - v2.e[1], v1.e[2] - v2.e[2]);
+}
+
+inline Vec3 operator-(const Vec3 &v1, const float & v) {
+	return Vec3(v1.e[0] - v, v1.e[1] - v, v1.e[2] - v);
 }
 
 inline Vec3 operator*(const Vec3 &v1, const Vec3 &v2) {
@@ -168,11 +184,5 @@ inline Vec3 Vec3::project_on_unit(Vec3 vec) const {
 	return x;
 }
 
-struct Sphere {
-	Vec3 center;
-	float radius;
-	Sphere() {}
-	Sphere(const Vec3&center, const float & radius):center(center),radius(radius) {}
-};
 
 float rand_next();

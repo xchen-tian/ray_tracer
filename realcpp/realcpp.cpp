@@ -7,6 +7,9 @@
 #include "ray.h"
 #include "objects.h"
 #include "camera.h"
+#include "hitable.h"
+#include "aabb.h"
+#include "bvh_node.h"
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -38,69 +41,16 @@ Vec3 normal_color(const Vec3 & v) {
 	return 0.5 * (v.to_unit_vector() + 1.0f);
 }
 
+Hitable * root;
 
-
-//bool hit_test(const Ray & ray, HitRecord& record, Object& objs) {
-//	const float T_MIN = 1e-9;
-//	const float T_MAX = 1e20;
-//	//1. project vector from ---> center to ray's direction
-//	//2. get perpendicular line length
-//	//3. compare it with radius
-//	//4. to get time t, need to get perpendicular point to hit point position (secant).
-//	//5. t = origin length - secant length (half)
-//	auto t1 = objs.sphere.center - ray.from;
-//	bool hit = false;
-//
-//	auto proj = t1.project_on_unit(ray.direction); // projection
-//	auto perpen = t1 - proj;
-//	hit = perpen.squared_length() < objs.sphere.radius * objs.sphere.radius;
-//	// positive angle < 90 degree
-//	if (t1.dot(ray.direction) < 0.0f) {
-//		hit = false;
-//	}
-//	if (hit) {
-//		const auto r = objs.sphere.radius;
-//		auto secant_length_half = sqrt(r * r - perpen.squared_length());
-//		float t = proj.length() - secant_length_half;
-//		if (!(T_MIN <= t)) {
-//			return false;
-//		}
-//		record.hit_point = ray.point_at(t);
-//		record.t = t;
-//		record.normal = -t1 + (record.hit_point - ray.from);
-//		record.normal.make_unit_vector();
-//	}
-//	return hit;
-//
-//}
-
-bool hit_test(const Ray& ray, HitRecord& rec, Object& obj) {
-	const float T_MIN = 1e-4;
-	const float T_MAX = 1e20;
-	Vec3 oc = ray.from - obj.sphere.center;
-	float a = ray.direction.squared_length();
-	float b = oc.dot(ray.direction);
-	auto radius = obj.sphere.radius;
-	float c = oc.squared_length() - radius * radius;
-	float discriminant = b * b - a * c;
-	if (discriminant > 0) {
-		float temp = (-b - sqrt(discriminant)) / a;
-		if (temp < T_MAX && temp > T_MIN) {
-			rec.t = temp;
-			rec.hit_point = ray.point_at(rec.t);
-			rec.normal = (rec.hit_point - obj.sphere.center) / radius;
-			return true;
-		}
-		temp = (-b + sqrt(discriminant)) / a;
-		if (temp < T_MAX && temp > T_MIN) {
-			rec.t = temp;
-			rec.hit_point = ray.point_at(rec.t);
-			rec.normal = (rec.hit_point - obj.sphere.center) / radius;
-			return true;
-		}
+void build_bvh() {
+	vector<Hitable *> h_list;
+	for (auto & i : objs) {
+		h_list.push_back(&i.sphere);
 	}
-	return false;
+	root = BVHNode_build(h_list);
 }
+
 
 Vec3 render(Ray &ray,int depth) {
 	// intersect with sphere closest
@@ -110,9 +60,11 @@ Vec3 render(Ray &ray,int depth) {
 	HitRecord record2;
 	bool hit = false;
 	Object* p = nullptr;
+
+	// change this to bvh
 	for (auto & i : objs) { // has to be reference
 		HitRecord record;
-		if (hit_test(ray,record,i)) {
+		if ( i.sphere.hit_test(ray,record) ) {
 			if (!hit) {
 				record2 = record;
 				hit = true;
@@ -122,9 +74,6 @@ Vec3 render(Ray &ray,int depth) {
 				record2 = record;
 				p = &i;
 			}
-			//cout << ray.direction << endl;
-			//return normal_color(record.normal);
-			//return red;
 		}
 	}
 
@@ -135,10 +84,8 @@ Vec3 render(Ray &ray,int depth) {
 		p->material->scatter(ray, record2, decay, ray_out);
 		return decay * render(ray_out, depth + 1);
 	}
-
 	//render background
 	return background(ray.direction.y());
-
 }
 
 inline int colorint(float f) {
@@ -269,10 +216,31 @@ void intersection_check() {
 	}
 }
 
+void print_bvh(Hitable* node, int depth) {
+
+	for (int i = 0; i < depth; i++)
+		cout << "--";
+	auto box = node->bounding_box();
+	cout << box.start << " <-> " << box.end ;
+
+	if (BVHNode* v = dynamic_cast<BVHNode*>(node)) {
+		// old was safely casted to NewType
+		cout << endl;
+		print_bvh(v->left, depth + 1);
+		print_bvh(v->right, depth + 1);
+	}
+	else {
+		cout << " !"<<endl;
+	}
+}
+
 void work() {
 	//create_scene2();
 	//create_scene_glass_ball();
 	create_scene_glass_random_balls();
+	build_bvh();
+	print_bvh(root,0);
+
 	Vec3 screen_top   (0,  1, 0);
 	Vec3 screen_bottom(0, -1, 0);
 	Vec3 screen_left  (-2,  0, 0);
@@ -283,8 +251,8 @@ void work() {
 
 	intersection_check();
 
-	resolution_h = 300 * 2;
-	resolution_w = 600 * 2;
+	//resolution_h = 300 * 2;
+	//resolution_w = 600 * 2;
 
 	ofstream fout;
 	ofstream txtout;
@@ -295,12 +263,13 @@ void work() {
 	fout << 255 << endl;
 
 	//#pragma omp parallel for
+	int counter = 0;
 	for (int h = 0; h < resolution_h; h++) {
 		for (int w = 0; w < resolution_w; w++) {
 			
 			Vec3 color{0,0,0};
-			const int sample_num = 150;
-			//const int sample_num = 20;
+			//const int sample_num = 150;
+			const int sample_num = 20;
 			for (int sample = 0; sample < sample_num; sample ++) {
 				float rh = (h + rand_next()) * 1.0 / resolution_h;
 				float rw = (w + rand_next()) * 1.0 / resolution_w;
@@ -317,6 +286,9 @@ void work() {
 
 			//txtout << to.y() << "\t";
 			fout << colorint(color.r()) << " " << colorint(color.g()) << " " << colorint(color.b()) << endl;
+			counter += 1;
+			if (counter % 100 == 0)
+				cout <<"Progress : "<< 100.0 * counter / resolution_h / resolution_w << " %" << endl;
 		}
 		//txtout << endl;
 	}
