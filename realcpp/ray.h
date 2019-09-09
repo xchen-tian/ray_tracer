@@ -2,15 +2,14 @@
 
 #include "pch.h"
 #include "common.h"
-#include "material.h"
-
-
 
 struct HitRecord {
 	float t; // the time of ray hits align the direction
 	Vec3 hit_point;
 	Vec3 normal;
+	void *hitted = nullptr;
 };
+
 
 struct Ray {
 	Vec3 from;

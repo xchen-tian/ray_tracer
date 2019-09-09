@@ -100,6 +100,10 @@ inline Vec3 operator-(const Vec3 &v1, const float & v) {
 	return Vec3(v1.e[0] - v, v1.e[1] - v, v1.e[2] - v);
 }
 
+inline Vec3 operator-(const float & v, const Vec3 &v1) {
+	return -(v1 - v);
+}
+
 inline Vec3 operator*(const Vec3 &v1, const Vec3 &v2) {
 	return Vec3(v1.e[0] * v2.e[0], v1.e[1] * v2.e[1], v1.e[2] * v2.e[2]);
 }

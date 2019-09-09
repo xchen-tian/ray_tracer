@@ -2,6 +2,8 @@
 #include "pch.h"
 #include "common.h"
 #include "ray.h"
+#include "hitable.h"
+#include "texture.h"
 #include <iostream>
 using namespace std;
 
@@ -36,20 +38,20 @@ struct Material {
 };
 
 struct Lambertian :public Material {
-	Vec3 albedo;
-	Lambertian(const Vec3& albedo) :albedo(albedo) {}
+	Texture *texture;
+	Lambertian(Texture* texture) :texture(texture) {}
 
 	virtual void scatter(const Ray& ray_in,
 		const HitRecord& record,
 		Vec3& decay,
 		Ray& ray_out) const {
-		decay = albedo;
+		decay = texture->value(0, 0, Vec3(record.hit_point));
 		ray_out.from = record.hit_point;
 		ray_out.direction = this->random_ray_direction(record.normal);
 	}
 
 	virtual std::ostream& print(std::ostream& o ) const {
-		o << "Lambertian: " << albedo;
+		o << "Lambertian: " << *texture;
 		return o;
 	}
 

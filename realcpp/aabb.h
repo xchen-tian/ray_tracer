@@ -4,9 +4,8 @@
 
 #include "common.h"
 #include "ray.h"
-#include "objects.h"
 #include <algorithm>
-
+#include <iostream>
 
 
 struct AABB {
@@ -30,6 +29,7 @@ struct AABB {
 		// p(t) = origin + direction * t;
 		// for each dimension, find time range, tmin, tmax
 		// find whether all dimension overlaps
+		
 		float tmin(1e19), tmax(-1e19);
 		for (int i = 0; i < 3; i++) {
 			float dir = ray.direction.e[i];
@@ -40,13 +40,14 @@ struct AABB {
 				// all range statisfy, do not check tmin or tmax
 			}
 			else {
+				
 				// y = b + a*t;
 				// (y-b)/a = t;
 				float t0 = (start[i] - b) / dir;
 				float t1 = (end[i] - b) / dir;
 				swapmin(t0, t1);
-				tmin = max(tmin, t0);
-				tmax = min(tmax, t1);
+				tmin = min(tmin, t0);
+				tmax = max(tmax, t1);
 			}
 		}
 		if (tmin > tmax) return false;

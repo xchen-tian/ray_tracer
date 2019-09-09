@@ -3,8 +3,7 @@
 #include "common.h"
 #include "hitable.h"
 #include "material.h"
-#include "ray.h"
-#include "aabb.h"
+#include <iostream>
 
 
 struct Sphere : public Hitable {
@@ -28,6 +27,7 @@ struct Sphere : public Hitable {
 				rec.t = temp;
 				rec.hit_point = ray.point_at(rec.t);
 				rec.normal = (rec.hit_point - center) / radius;
+				rec.hitted = (void *)this;
 				return true;
 			}
 			temp = (-b + sqrt(discriminant)) / a;
@@ -35,6 +35,7 @@ struct Sphere : public Hitable {
 				rec.t = temp;
 				rec.hit_point = ray.point_at(rec.t);
 				rec.normal = (rec.hit_point - center) / radius;
+				rec.hitted = (void *)this;
 				return true;
 			}
 		}

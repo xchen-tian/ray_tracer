@@ -6,6 +6,8 @@
 #include "ray.h"
 #include "aabb.h"
 
+
+
 struct Hitable {
 	virtual bool hit_test(const Ray& ray, HitRecord& rec) const = 0;
 

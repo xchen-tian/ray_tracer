@@ -10,11 +10,14 @@
 #include "hitable.h"
 #include "aabb.h"
 #include "bvh_node.h"
+#include "noise.h"
 #include <iostream>
 #include <fstream>
 #include <vector>
 #include <random>
+#include <map>
 #include <omp.h>
+#include <chrono>
 
 
 using namespace std;
@@ -24,6 +27,7 @@ Vec3 white(1.0f, 1.0f, 1.0f);
 Vec3 red(.9f, .0f, .0f);
 
 vector<Object> objs;
+map< Hitable *,Material * > material_map;
 
 Camera camera_origin = Camera(origin, {0,0,1.0f}, { 0,1.0f,0 }, 1.0f, 2.0f); 
 
@@ -57,31 +61,41 @@ Vec3 render(Ray &ray,int depth) {
 	if (depth > 50)
 		return origin; // black
 
-	HitRecord record2;
+	//HitRecord record2;
 	bool hit = false;
 	Object* p = nullptr;
+	HitRecord record2;
 
 	// change this to bvh
-	for (auto & i : objs) { // has to be reference
-		HitRecord record;
-		if ( i.sphere.hit_test(ray,record) ) {
-			if (!hit) {
-				record2 = record;
-				hit = true;
-				p = &i;
-			}
-			else if (record.t < record2.t) {
-				record2 = record;
-				p = &i;
-			}
-		}
-	}
+	//for (auto & i : objs) { // has to be reference
+	//	HitRecord record;
+	//	if ( i.sphere.hit_test(ray,record) ) {
+	//		if (!hit) {
+	//			record2 = record;
+	//			hit = true;
+	//			record2.hitted = &i;
+	//			p = &i;
+	//		}
+	//		else if (record.t < record2.t) {
+	//			record2 = record;
+	//			p = &i;
+	//		}
+	//	}
+	//}
+
+	HitRecord record;
+	hit = root->hit_test(ray, record);
+	//HitRecord record(record2);
 
 	if (hit) {
+		//cout << " hit !!! " << std::endl;
 		Ray ray_out;
 		Vec3 decay;
-		//cout <<  *(p->material) << " "<<record2.hit_point<<" "<< record2.t  << endl;
-		p->material->scatter(ray, record2, decay, ray_out);
+		//Hitable * hitable = (Hitable *)record.hitted;
+		Hitable * hitable = (Hitable *)record.hitted;
+		auto * material = material_map[hitable];
+		//cout <<  *(p->material) << " "<<record.hit_point<<" "<< record.t  << endl; // debug
+		material->scatter(ray, record, decay, ray_out);
 		return decay * render(ray_out, depth + 1);
 	}
 	//render background
@@ -101,12 +115,30 @@ void create_scene1() {
 	//spheres.push_back(ground);
 }
 
-Material* mred = new Lambertian({ 0.8, 0.3, 0.2 }); // red
-Material* mgreen = new Lambertian({ 0.3, 0.8, 0.2 }); // green
-Material* mgrey = new Lambertian({ 0.5, 0.5, 0.5 }); // grey
-Material* mpurple = new Lambertian({ 0.8, 0.5, 0.8 }); // purple
-Material* morange = new Lambertian({ 0.9, 0.5, 0.1 }); // orange
-Material* mcyan = new Lambertian({ 0.1, 0.8, 0.8 }); // cyan
+PerlinNoise noise = PerlinNoise();
+Texture *noise_tex = new NoiseTexture(&noise);
+Texture *turb_tex = new TurbTexture(&noise);
+Texture *marble_tex = new MarbleTexture(&noise);
+
+
+Texture *red_tex = new ColorTexture({ 0.8, 0.3, 0.2 });
+Texture *green_tex = new ColorTexture({ 0.3, 0.8, 0.2 });
+Texture *grey_tex = new ColorTexture({ 0.5, 0.5, 0.5 });
+Texture *purple_tex = new ColorTexture({ 0.8, 0.5, 0.8 });
+Texture *orange_tex = new ColorTexture({ 0.9, 0.5, 0.1 });
+Texture *cyan_tex = new ColorTexture({ 0.1, 0.8, 0.8 });
+Texture *white_tex = new ColorTexture({ 0.9, 0.9, 0.9 });
+
+Texture *grid_tex = new GridTexture(white_tex,green_tex);
+
+Material* mred = new Lambertian(red_tex); // red
+Material* mgreen = new Lambertian(red_tex); // green
+Material* mgrey = new Lambertian(grey_tex); // grey
+Material* mpurple = new Lambertian(purple_tex); // purple
+Material* morange = new Lambertian(orange_tex); // orange
+Material* mcyan = new Lambertian(cyan_tex); // cyan
+
+Material* mground = new Lambertian(grid_tex); // grid color
 
 Material* lambertians[] = { mred , mgreen , mgrey , mpurple ,morange ,mcyan };
 
@@ -118,7 +150,13 @@ Material* iron = new Metal({ 0.8, 0.8, 0.9 }, 0.2); // iron
 Material* glass = new Glass({ 1.0, 1.0, 1.0 }, 0.0, 1.5); // iron
 Material* glass2 = new Glass({ 1.0, 1.0, 1.0 }, 0.05, 1.3); // iron
 
-void create_scene2() { 
+Material* material_noise = new Lambertian(noise_tex); // iron
+Material* material_turb = new Lambertian(turb_tex); // iron
+Material* material_marble = new Lambertian(marble_tex); // iron
+
+
+
+void create_scene2() {
 
 	Sphere s1 = Sphere({ 0, 0, 5 }, 2);
 	Sphere s2 = Sphere({ 5, 0, 5 }, 2);
@@ -127,10 +165,11 @@ void create_scene2() {
 
 	objs = {
 		Object(s1,iron),
-		Object(s2,silver),
-		Object(s3,gold),
-		Object(ground,mgrey)
+		Object(s3,material_marble),
+		Object(ground,material_marble)
 	};
+	camera2 = Camera({ -4,2,-3 },
+		{ 13,0,35 }, { 0,1.0f,0 }, 1.0f, 2.0f);
 }
 
 void create_scene_glass_ball() {
@@ -159,7 +198,7 @@ void create_scene_glass_random_balls() {
 		Object(s1,glass),
 		Object(s2,silver),
 		Object(s3,gold),
-		Object(ground,mgrey)
+		Object(ground,mground)
 	};
 	
 	for (int i = 0; i < 20; i++) {
@@ -201,6 +240,13 @@ void create_scene_glass_random_balls() {
 
 }
 
+void make_material_mapped() {
+	for (auto & i : objs) {
+		Hitable * addr = &(i.sphere);
+		material_map[ addr] = i.material;
+	}
+}
+
 void intersection_check() {
 	int n = objs.size();
 	for (int i = 0; i < n; i++) {
@@ -235,9 +281,9 @@ void print_bvh(Hitable* node, int depth) {
 }
 
 void work() {
-	//create_scene2();
+	create_scene2();
 	//create_scene_glass_ball();
-	create_scene_glass_random_balls();
+	//create_scene_glass_random_balls();
 	build_bvh();
 	print_bvh(root,0);
 
@@ -251,8 +297,10 @@ void work() {
 
 	intersection_check();
 
-	//resolution_h = 300 * 2;
-	//resolution_w = 600 * 2;
+	make_material_mapped();
+
+	resolution_h = 300 * 2;
+	resolution_w = 600 * 2;
 
 	ofstream fout;
 	ofstream txtout;
@@ -287,7 +335,7 @@ void work() {
 			//txtout << to.y() << "\t";
 			fout << colorint(color.r()) << " " << colorint(color.g()) << " " << colorint(color.b()) << endl;
 			counter += 1;
-			if (counter % 100 == 0)
+			if (counter % 300 == 0)
 				cout <<"Progress : "<< 100.0 * counter / resolution_h / resolution_w << " %" << endl;
 		}
 		//txtout << endl;
@@ -296,5 +344,9 @@ void work() {
 
 int main()
 {
+	auto start = chrono::system_clock::now();
 	work();
+	auto end = chrono::system_clock::now();
+	chrono::duration<double> duration = end - start;
+	cout << "program time cost: " << duration.count() << endl;
 }

@@ -3,7 +3,7 @@
 #include "common.h"
 #include "hitable.h"
 #include "aabb.h"
-
+#include <iostream>
 
 struct BVHNode : public Hitable {
 
