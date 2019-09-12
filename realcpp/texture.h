@@ -2,6 +2,7 @@
 #include "pch.h"
 #include "common.h"
 #include "noise.h"
+#include <algorithm>
 #include <iostream>
 
 struct Texture {
@@ -25,6 +26,35 @@ struct ColorTexture :Texture {
 	}
 	virtual std::ostream& print(std::ostream& o) const {
 		o << "ColorTexture" << this->color ;
+		return o;
+	}
+
+};
+
+struct ImageTexture :Texture {
+	unsigned char * data;
+	int row,col;
+	ImageTexture(unsigned char * data,int row,int col) : data(data), row(row), col(col) {}
+	virtual Vec3 value(float u, float v, const Vec3 & p) const {
+		int tu = (int)(u * row); 
+		int tv = (int)(v * col);
+		tu = std::max(tu, 0);
+		tv = std::max(tv, 0);
+
+		tu = std::min(tu, row - 1);
+		tv = std::min(tv, col - 1);
+		int pos = 3 * (tu * col + tv);
+		float r = (float)data[pos] / 255.0f;
+		float g = (float)data[pos+1] / 255.0f;
+		float b = (float)data[pos+2] / 255.0f;
+		//cout << "pos" << pos <<" uv"<<u <<"   "<<v <<"  | "<<tu <<" , "<<tv << endl; // debug
+
+		//cout << "rgb" << r << "  " << b << "  " << g << endl; // debug
+		return Vec3(r,g,b);
+	}
+
+	virtual std::ostream& print(std::ostream& o) const {
+		o << "ImageTexture("<<row<<"x"<<col<<")";
 		return o;
 	}
 

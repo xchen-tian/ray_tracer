@@ -7,6 +7,7 @@ struct HitRecord {
 	float t; // the time of ray hits align the direction
 	Vec3 hit_point;
 	Vec3 normal;
+	float u, v;
 	void *hitted = nullptr;
 };
 

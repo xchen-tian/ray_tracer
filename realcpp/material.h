@@ -28,7 +28,7 @@ struct Material {
 			return (-v).to_unit_vector();
 		}
 	}
-
+	bool self_luminous = false;
 
 
 	inline Vec3 reflect(const Vec3& direction, const Vec3& normal) const {
@@ -45,12 +45,33 @@ struct Lambertian :public Material {
 		const HitRecord& record,
 		Vec3& decay,
 		Ray& ray_out) const {
-		decay = texture->value(0, 0, Vec3(record.hit_point));
+		decay = texture->value(record.u, record.v, Vec3(record.hit_point));
 		ray_out.from = record.hit_point;
 		ray_out.direction = this->random_ray_direction(record.normal);
 	}
 
 	virtual std::ostream& print(std::ostream& o ) const {
+		o << "Lambertian: " << *texture;
+		return o;
+	}
+
+};
+
+struct Light:public Material {
+	Texture *texture;
+	Light(Texture* texture) :texture(texture) {
+		self_luminous = true;
+	}
+
+	virtual void scatter(const Ray& ray_in,
+		const HitRecord& record,
+		Vec3& decay,
+		Ray& ray_out) const {
+		decay = texture->value(record.u, record.v, Vec3(record.hit_point));
+		// in self_luminous material only decay is important
+	}
+
+	virtual std::ostream& print(std::ostream& o) const {
 		o << "Lambertian: " << *texture;
 		return o;
 	}

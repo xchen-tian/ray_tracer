@@ -1,6 +1,7 @@
 // realcpp.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
 
+
 #include "pch.h"
 #include "common.h"
 #include "material.h"
@@ -11,6 +12,10 @@
 #include "aabb.h"
 #include "bvh_node.h"
 #include "noise.h"
+
+#define STB_IMAGE_IMPLEMENTATION    
+
+#include "stb_image.h"
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -35,10 +40,16 @@ Camera camera2 = Camera({-4,10,-20},
 	{ 13,0,35 }, { 0,1.0f,0 }, 1.0f, 2.0f);
 
 Vec3 background(float y) {
-	const Vec3 top(0.5, 0.6, 0.8);
+	// ----- sky background
+
+	/*const Vec3 top(0.5, 0.6, 0.8);
 	const Vec3 bottom(0.9, 0.9, 0.8);
 	y = 0.5*(y + 1.0);
-	return top *y + (1.0f - y)*bottom;
+	return top *y + (1.0f - y)*bottom;*/
+
+	// ----- dark background
+	return { 0.0f,0.0f, 0.0f };
+
 }
 
 Vec3 normal_color(const Vec3 & v) {
@@ -50,7 +61,7 @@ Hitable * root;
 void build_bvh() {
 	vector<Hitable *> h_list;
 	for (auto & i : objs) {
-		h_list.push_back(&i.sphere);
+		h_list.push_back(i.hitable);
 	}
 	root = BVHNode_build(h_list);
 }
@@ -96,6 +107,8 @@ Vec3 render(Ray &ray,int depth) {
 		auto * material = material_map[hitable];
 		//cout <<  *(p->material) << " "<<record.hit_point<<" "<< record.t  << endl; // debug
 		material->scatter(ray, record, decay, ray_out);
+		if (material->self_luminous)
+			return decay;
 		return decay * render(ray_out, depth + 1);
 	}
 	//render background
@@ -154,14 +167,31 @@ Material* material_noise = new Lambertian(noise_tex); // iron
 Material* material_turb = new Lambertian(turb_tex); // iron
 Material* material_marble = new Lambertian(marble_tex); // iron
 
+Texture*  earth_tex;
+Material* material_earth;
+Material* material_light = new Light(white_tex);
 
+unsigned char * load_image(const char * path, int &col, int &row) {
+	int channels;
+	unsigned char * data; 
+	data = stbi_load(path, &col, &row, &channels,0);
+	cout << "loaded image " << path << "   row x col x channel: " << row << " x " << col << " x " << channels << endl;
+	return data;
+}
+
+void init_img_texture() {
+	int row, col;
+	auto * data = load_image("earth.jpg",col,row);
+	earth_tex = new ImageTexture(data,row,col);
+	material_earth = new Lambertian(earth_tex);
+}
 
 void create_scene2() {
 
-	Sphere s1 = Sphere({ 0, 0, 5 }, 2);
-	Sphere s2 = Sphere({ 5, 0, 5 }, 2);
-	Sphere s3 = Sphere({ -4, 0, 5 }, 2);
-	Sphere ground = Sphere({ 0,-1400.05 - 2,5 }, 1400);
+	Sphere *s1 = new Sphere({ 0, 0, 5 }, 2);
+	Sphere *s2 = new Sphere({ 5, 0, 5 }, 2);
+	Sphere *s3 = new Sphere({ -4, 0, 5 }, 2);
+	Sphere *ground = new Sphere({ 0,-1400.05 - 2,5 }, 1400);
 
 	objs = {
 		Object(s1,iron),
@@ -172,12 +202,26 @@ void create_scene2() {
 		{ 13,0,35 }, { 0,1.0f,0 }, 1.0f, 2.0f);
 }
 
+void create_scene_earth() {
+
+	Sphere * s1 = new Sphere({ 0, 3, 5 }, 5);
+	Sphere * ground = new Sphere({ 0,-1400.05 - 2,5 }, 1400);
+
+	objs = {
+		Object(s1,material_earth),
+		Object(ground,mgrey)
+	};
+	camera2 = Camera({ -4,2,-3 },
+		{ 13,0,35 }, { 0,1.0f,0 }, 1.0f, 2.0f);
+}
+
+
 void create_scene_glass_ball() {
 
-	Sphere s1 = Sphere({ 0, -0.2, 4 }, 1.5);
-	Sphere s2 = Sphere({ 2.5, 0, 8 }, 2);
-	Sphere s3 = Sphere({ -2.5, 0, 6 }, 2);
-	Sphere ground = Sphere({ 0,-1400.05 - 2,5 }, 1400);
+	Sphere * s1 = new Sphere({ 0, -0.2, 4 }, 1.5);
+	Sphere * s2 = new Sphere({ 2.5, 0, 8 }, 2);
+	Sphere * s3 = new Sphere({ -2.5, 0, 6 }, 2);
+	Sphere * ground = new Sphere({ 0,-1400.05 - 2,5 }, 1400);
 
 	objs = {
 		Object(s1,glass2),
@@ -187,12 +231,30 @@ void create_scene_glass_ball() {
 	};
 }
 
+void create_scene_light_rect_and_ball() {
+
+	Sphere * s1 = new Sphere({ 0, -0.2, 4 }, 1.5);
+	Sphere * s2 = new Sphere({ -4, 0, 8 }, 2);
+	XY_Rectangle * rect1 = new XY_Rectangle(-10,3,0,10,10);
+	Sphere * ground = new Sphere({ 0,-1400.05 - 2,5 }, 1400);
+
+	objs = {
+		Object(s1,glass),
+		Object(s2,mred),
+		Object(rect1,material_light),
+		Object(ground,mgrey)
+	};
+	camera2 = Camera({ -4,2,-3 },
+		{ 13,0,35 }, { 0,1.0f,0 }, 1.0f, 2.0f);
+}
+
+
 void create_scene_glass_random_balls() {
 
-	Sphere s1 = Sphere({ 0,     10.2, 12 }, 15);
-	Sphere s2 = Sphere({ 25,    5,   17 }, 10);
-	Sphere s3 = Sphere({ -20.5, 5,   4 }, 5);
-	Sphere ground = Sphere({ 0,-1404.05 - 2,5 }, 1400);
+	Sphere * s1 = new Sphere({ 0,     10.2, 12 }, 15);
+	Sphere * s2 = new Sphere({ 25,    5,   17 }, 10);
+	Sphere * s3 = new Sphere({ -20.5, 5,   4 }, 5);
+	Sphere * ground = new Sphere({ 0,-1404.05 - 2,5 }, 1400);
 
 	objs = {
 		Object(s1,glass),
@@ -202,18 +264,18 @@ void create_scene_glass_random_balls() {
 	};
 	
 	for (int i = 0; i < 20; i++) {
-		Sphere s;
+		Sphere * s;
 		do {
 			auto xpos = rand_next() * 2 * 20;
 			auto zpos = rand_next() * 2 * 40 + 20;
 			auto ypos = rand_next() * 4;
 			auto radius = 1 + rand() * 2;
-			s = Sphere({ xpos,ypos,zpos },radius);
+			s = new Sphere({ xpos,ypos,zpos },radius);
 			bool flag = false;
 			for (int j = 0; j < objs.size(); j++) {
-				auto& s2 = objs[j].sphere;
-				float l = (s.center - s2.center).length();
-				bool intersect = l < (s.radius + s2.radius);
+				Sphere * s2 = dynamic_cast<Sphere *>(objs[j].hitable);
+				float l = (s->center - s2->center).length();
+				bool intersect = l < (s->radius + s2->radius);
 				if (intersect) {
 					flag = true;
 				}
@@ -231,9 +293,12 @@ void create_scene_glass_random_balls() {
 					m = lambertians[r2 % 6];
 				}
 				auto && temp = Object(s, m);
-				cout << " generated ball at " << s.center << " material " << m << endl;
+				cout << " generated ball at " << s->center << " material " << m << endl;
 				objs.push_back(temp);
 				break;
+			}
+			else {
+				delete s;
 			}
 		} while (true);
 	}
@@ -242,7 +307,7 @@ void create_scene_glass_random_balls() {
 
 void make_material_mapped() {
 	for (auto & i : objs) {
-		Hitable * addr = &(i.sphere);
+		Hitable * addr = i.hitable;
 		material_map[ addr] = i.material;
 	}
 }
@@ -251,10 +316,10 @@ void intersection_check() {
 	int n = objs.size();
 	for (int i = 0; i < n; i++) {
 		for (int j = 0; j < i; j++) {
-			auto& s1 = objs[i].sphere;
-			auto& s2 = objs[j].sphere;
-			float l = (s1.center - s2.center).length();
-			bool intersect = l < (s1.radius + s2.radius);
+			Sphere * s1 = dynamic_cast<Sphere *>(objs[i].hitable);
+			Sphere * s2 = dynamic_cast<Sphere *>(objs[j].hitable);
+			float l = (s1->center - s2->center).length();
+			bool intersect = l < (s1->radius + s2->radius);
 			if (intersect) {
 				cout << i << " intersect with " << j << endl;
 			}
@@ -281,7 +346,10 @@ void print_bvh(Hitable* node, int depth) {
 }
 
 void work() {
-	create_scene2();
+	init_img_texture();
+	//create_scene2();
+	//create_scene_earth();
+	create_scene_light_rect_and_ball();
 	//create_scene_glass_ball();
 	//create_scene_glass_random_balls();
 	build_bvh();
@@ -295,7 +363,7 @@ void work() {
 	int resolution_h = 300;
 	int resolution_w = 600;
 
-	intersection_check();
+	//intersection_check();
 
 	make_material_mapped();
 
@@ -316,8 +384,8 @@ void work() {
 		for (int w = 0; w < resolution_w; w++) {
 			
 			Vec3 color{0,0,0};
-			//const int sample_num = 150;
-			const int sample_num = 20;
+			const int sample_num = 150;
+			//const int sample_num = 20;
 			for (int sample = 0; sample < sample_num; sample ++) {
 				float rh = (h + rand_next()) * 1.0 / resolution_h;
 				float rw = (w + rand_next()) * 1.0 / resolution_w;
