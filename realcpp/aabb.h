@@ -25,6 +25,19 @@ struct AABB {
 		b = t;
 	}
 
+	inline vector<Vec3> all_points() {
+		vector<Vec3> v;
+		v.push_back(start);
+		v.push_back({ start[0],start[1],  end[2] });
+		v.push_back({ start[0],  end[1],start[2] });
+		v.push_back({ start[0],  end[1],  end[2] });
+		v.push_back({   end[0],start[1],start[2] });
+		v.push_back({   end[0],start[1],  end[2] });
+		v.push_back({   end[0],  end[1],start[2] });
+		v.push_back(end);
+		return v;
+	}
+
 	inline bool hit_test(const Ray& ray) const {
 		// p(t) = origin + direction * t;
 		// for each dimension, find time range, tmin, tmax

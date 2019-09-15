@@ -189,4 +189,60 @@ inline Vec3 Vec3::project_on_unit(Vec3 vec) const {
 }
 
 
+
+struct Matrix3 {
+	Vec3 rows[3];
+
+	Matrix3(Vec3 v0, Vec3 v1, Vec3 v2) : rows{v0,v1,v2} {
+	}
+
+	inline Vec3& operator*(const Vec3& v2) const {
+		Vec3 result;
+		int i = 0;
+		for (const auto& r : rows) {
+			result[i] = r.dot(v2);
+			i++;
+		}
+		return result;
+	}
+
+	static Matrix3 rotation_matrix_x(float theta) {
+		return Matrix3(
+			{ 1.0f, 0.0f, 0.0f },
+			{ 0.0f, cos(theta),  sin(theta) },
+			{ 0.0f, -sin(theta), cos(theta) }
+		);
+	}
+
+	static Matrix3 rotation_matrix_y(float theta) {
+		auto a = Matrix3(
+			{ cos(theta), 0.0f, -sin(theta) },
+			{ 0.0f, 1.0f, 0.0f },
+			{ sin(theta), 0.0f, cos(theta) }
+		);
+		//cout << a << endl; //debug
+		return a;
+	}
+	
+	static Matrix3 rotation_matrix_z(float theta) {
+		return Matrix3(
+			{  cos(theta), sin(theta),  0.0f },
+			{ -sin(theta), cos(theta),  0.0f },
+			{ 0.0f, 0.0f, 1.0f }
+		);
+	}
+
+};
+
+inline std::ostream& operator<<(std::ostream& os, const Matrix3 & m) {
+	os << m.rows[0] << endl;
+	os << m.rows[1] << endl;
+	os << m.rows[2] << endl;
+	return os;
+}
+
+
 float rand_next();
+
+
+

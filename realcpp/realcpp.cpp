@@ -42,10 +42,10 @@ Camera camera2 = Camera({-4,10,-20},
 Vec3 background(float y) {
 	// ----- sky background
 
-	/*const Vec3 top(0.5, 0.6, 0.8);
-	const Vec3 bottom(0.9, 0.9, 0.8);
-	y = 0.5*(y + 1.0);
-	return top *y + (1.0f - y)*bottom;*/
+	//const Vec3 top(0.5, 0.6, 0.8);
+	//const Vec3 bottom(0.9, 0.9, 0.8);
+	//y = 0.5*(y + 1.0);
+	//return top *y + (1.0f - y)*bottom;
 
 	// ----- dark background
 	return { 0.0f,0.0f, 0.0f };
@@ -77,29 +77,13 @@ Vec3 render(Ray &ray,int depth) {
 	Object* p = nullptr;
 	HitRecord record2;
 
-	// change this to bvh
-	//for (auto & i : objs) { // has to be reference
-	//	HitRecord record;
-	//	if ( i.sphere.hit_test(ray,record) ) {
-	//		if (!hit) {
-	//			record2 = record;
-	//			hit = true;
-	//			record2.hitted = &i;
-	//			p = &i;
-	//		}
-	//		else if (record.t < record2.t) {
-	//			record2 = record;
-	//			p = &i;
-	//		}
-	//	}
-	//}
 
 	HitRecord record;
 	hit = root->hit_test(ray, record);
 	//HitRecord record(record2);
 
 	if (hit) {
-		//cout << " hit !!! " << std::endl;
+		//cout << " hit !!! "<< record.hitted << " at "<< record.hit_point << endl;//debug
 		Ray ray_out;
 		Vec3 decay;
 		//Hitable * hitable = (Hitable *)record.hitted;
@@ -116,7 +100,9 @@ Vec3 render(Ray &ray,int depth) {
 }
 
 inline int colorint(float f) {
-	return int(255.99 * f);
+	auto a = int(255.99 * f);
+	a = min(255, a);
+	return a;
 }
 
 void create_scene1() {
@@ -137,6 +123,9 @@ Texture *marble_tex = new MarbleTexture(&noise);
 Texture *red_tex = new ColorTexture({ 0.8, 0.3, 0.2 });
 Texture *green_tex = new ColorTexture({ 0.3, 0.8, 0.2 });
 Texture *grey_tex = new ColorTexture({ 0.5, 0.5, 0.5 });
+
+Texture* greywhite_tex = new ColorTexture({ 0.8, 0.8, 0.8 });
+
 Texture *purple_tex = new ColorTexture({ 0.8, 0.5, 0.8 });
 Texture *orange_tex = new ColorTexture({ 0.9, 0.5, 0.1 });
 Texture *cyan_tex = new ColorTexture({ 0.1, 0.8, 0.8 });
@@ -145,8 +134,10 @@ Texture *white_tex = new ColorTexture({ 0.9, 0.9, 0.9 });
 Texture *grid_tex = new GridTexture(white_tex,green_tex);
 
 Material* mred = new Lambertian(red_tex); // red
-Material* mgreen = new Lambertian(red_tex); // green
+Material* mgreen = new Lambertian(green_tex); // green
 Material* mgrey = new Lambertian(grey_tex); // grey
+Material* mgreywhite = new Lambertian(greywhite_tex); // grey
+
 Material* mpurple = new Lambertian(purple_tex); // purple
 Material* morange = new Lambertian(orange_tex); // orange
 Material* mcyan = new Lambertian(cyan_tex); // cyan
@@ -231,21 +222,107 @@ void create_scene_glass_ball() {
 	};
 }
 
+void cornel_box() {
+	// create a -10 ~ 10 box
+	XY_Rectangle* rect_wall = new XY_Rectangle(0, 0, 10, 10, 0);
+	XY_Rectangle* rect_left = new XY_Rectangle(*rect_wall);
+	XY_Rectangle* rect_right = new XY_Rectangle(*rect_wall);
+	XY_Rectangle* rect_floor = new XY_Rectangle(0, 0, 20, 10, 0);
+
+	rect_wall->z = 10;
+	rect_wall->x0 = -10;
+	auto r_left = Matrix3::rotation_matrix_y(90.0 / 180 * PI);
+	auto i_r_left = Matrix3::rotation_matrix_y(-90.0 / 180 * PI);
+
+	auto r_x= Matrix3::rotation_matrix_x(90.0 / 180 * PI);
+	auto i_r_x= Matrix3::rotation_matrix_x(-90.0 / 180 * PI);
+	
+	XY_Rectangle* rect_light = new XY_Rectangle(-3, -3, 3, 3, 10);
+	auto* left = new TranslateObj({ -10,0,0 }, 
+		new RotateObj( r_left,i_r_left , rect_left));
+
+	auto* right = new TranslateObj({ 10,0,10 },
+		new RotateObj(i_r_left, r_left, rect_right));
+
+	auto* l = new TranslateObj({ 0, -0.001,5 },
+		new RotateObj(r_x, i_r_x, rect_light));
+
+	auto* fl = new TranslateObj({ -10,0,10 },
+		new RotateObj(r_x, i_r_x, rect_floor));
+
+	auto* cei = new TranslateObj({ -10,10,10 },
+		new RotateObj(r_x, i_r_x, rect_floor));
+
+	auto* box_1= new TranslateObj({ -5.5,0,4 },
+		new BoxObj({ 4,7,4} ));
+
+	auto* box_2 = new TranslateObj({ 3,0,1 },
+		new RotateObj( Matrix3::rotation_matrix_y(PI/6), Matrix3::rotation_matrix_y( -PI / 6),
+		new BoxObj({ 2,3,2 })));
+
+	auto* sphere = new Sphere({ 3,2,-1 }, 1.7);
+
+	objs = {
+		Object( left , mgreen),
+		Object( rect_wall, mgreywhite),
+		Object( right, mred),
+		Object( fl, mgreywhite),
+		Object( cei, mgreywhite),
+		Object( box_1, mgrey),
+		//Object( box_2, mgrey),
+		Object(sphere, glass),
+		Object( l, material_light)
+	};
+
+	cout << " fl  addr " << fl  << endl;
+	cout << " cei addr " << cei << endl;
+	cout << " l   addr " << l   << endl;
+
+	cout << " right addr " << right << endl;
+	cout << " left   addr " << left << endl;
+	
+	camera2 = Camera({ 0, 5, -5.5 }, { 0,5,35 }, { 0,1.0f,0 }, 1.0f, 2.0f);
+
+}
+
+void create_box_scene() {
+	BoxObj* box = new BoxObj({ 1,2,3 });
+	auto* shift = new TranslateObj({ 3,0,0 }, box);
+	objs = {
+		//Object(box, mgreen)
+		Object(shift, mgreen)
+	};
+
+	camera2 = Camera({ 0, 5, -5 }, { 0,0,35 }, { 0,1.0f,0 }, 1.0f, 2.0f);
+}
+
 void create_scene_light_rect_and_ball() {
 
 	Sphere * s1 = new Sphere({ 0, -0.2, 4 }, 1.5);
 	Sphere * s2 = new Sphere({ -4, 0, 8 }, 2);
-	XY_Rectangle * rect1 = new XY_Rectangle(-10,3,0,10,10);
+	XY_Rectangle * rect1 = new XY_Rectangle(0,0,10,10,0);
+	auto rotate_y = Matrix3::rotation_matrix_y(-30.0 / 180.0 * PI);
+	auto i_rotate_y = Matrix3::rotation_matrix_y(30.0 / 180.0 * PI);
+	RotateObj* rot = new RotateObj( rotate_y, i_rotate_y, rect1 );
+	TranslateObj* tans = new TranslateObj({0, 0 ,10}, rot);
+
 	Sphere * ground = new Sphere({ 0,-1400.05 - 2,5 }, 1400);
+
+	cout << " rot addr " << rot << endl;//debug
 
 	objs = {
 		Object(s1,glass),
 		Object(s2,mred),
-		Object(rect1,material_light),
+		//Object(rect1,material_light),
+		//Object(rot,material_light),
+		//Object(tans,material_light),
+		Object(tans, mred),
 		Object(ground,mgrey)
 	};
-	camera2 = Camera({ -4,2,-3 },
-		{ 13,0,35 }, { 0,1.0f,0 }, 1.0f, 2.0f);
+	//camera2 = Camera({ -4,2,-3 },
+	//	{ 13,0,35 }, { 0,1.0f,0 }, 1.0f, 2.0f);
+
+	camera2 = Camera({ 0, 2, 0 },{ 0,0,35 }, { 0,1.0f,0 }, 1.0f, 2.0f);
 }
 
 
@@ -349,10 +426,13 @@ void work() {
 	init_img_texture();
 	//create_scene2();
 	//create_scene_earth();
-	create_scene_light_rect_and_ball();
+	//create_scene_light_rect_and_ball();
+	cornel_box();
+	//create_box_scene();
 	//create_scene_glass_ball();
 	//create_scene_glass_random_balls();
 	build_bvh();
+	cout << "-------------------- print BVH ----------------------" << endl;
 	print_bvh(root,0);
 
 	Vec3 screen_top   (0,  1, 0);
@@ -382,9 +462,11 @@ void work() {
 	int counter = 0;
 	for (int h = 0; h < resolution_h; h++) {
 		for (int w = 0; w < resolution_w; w++) {
+
+			//if (w != 700 || h != 375) continue;
 			
 			Vec3 color{0,0,0};
-			const int sample_num = 150;
+			const int sample_num = 1500*5;
 			//const int sample_num = 20;
 			for (int sample = 0; sample < sample_num; sample ++) {
 				float rh = (h + rand_next()) * 1.0 / resolution_h;
@@ -398,12 +480,13 @@ void work() {
 				Vec3 colorx = render(ray,0);
 				color += colorx;
 			}
-			color /= 1.0 * sample_num;
+			color /= .3 * sample_num;
 
 			//txtout << to.y() << "\t";
 			fout << colorint(color.r()) << " " << colorint(color.g()) << " " << colorint(color.b()) << endl;
+			//cout << colorint(color.r()) << " " << colorint(color.g()) << " " << colorint(color.b()) << endl; //debug
 			counter += 1;
-			if (counter % 300 == 0)
+			if (counter % 500 == 0)
 				cout <<"Progress : "<< 100.0 * counter / resolution_h / resolution_w << " %" << endl;
 		}
 		//txtout << endl;

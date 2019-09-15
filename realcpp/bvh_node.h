@@ -19,7 +19,8 @@ struct BVHNode : public Hitable {
 		box = AABB(a.start.minvec(b.start), a.end.maxvec(b.end));
 	}
 
-
+	inline void hit_u_v(HitRecord& rec) const {
+	}
 
 	// Inherited via Hitable
 	virtual AABB bounding_box() const {
@@ -49,6 +50,12 @@ struct BVHNode : public Hitable {
 			return true;
 		}
 		else return false;
+	}
+
+
+	// Inherited via Hitable
+	inline Vec3 center_gravity() const {
+		return Vec3{ 0.0f, 0.0f ,0.0f };
 	}
 
 };
@@ -98,6 +105,5 @@ inline Hitable* BVHNode_build(vector<Hitable *> hits) {
 	cout << " r " << r << " " << x->box.start <<" <->"<<x->box.end << endl;//debug
 	return x;
 }
-
 
 
