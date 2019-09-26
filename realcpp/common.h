@@ -8,6 +8,7 @@
 #include <random>
 #include <algorithm>
 
+#define PI 3.14159265358979f
 
 using namespace std;
 
@@ -56,6 +57,10 @@ public:
 
 	inline Vec3 maxvec(const Vec3 & vec) const {
 		return { max(e[0],vec.e[0]), max(e[1],vec.e[1]), max(e[2],vec.e[2]) };
+	}
+
+	inline bool anyNan() const {
+		return isnan(e[0]) || isnan(e[1]) || isnan(e[2]);
 	}
 
 	float e[3];
@@ -196,7 +201,7 @@ struct Matrix3 {
 	Matrix3(Vec3 v0, Vec3 v1, Vec3 v2) : rows{v0,v1,v2} {
 	}
 
-	inline Vec3& operator*(const Vec3& v2) const {
+	inline Vec3 operator*(const Vec3& v2) const {
 		Vec3 result;
 		int i = 0;
 		for (const auto& r : rows) {
@@ -243,6 +248,21 @@ inline std::ostream& operator<<(std::ostream& os, const Matrix3 & m) {
 
 
 float rand_next();
+float rand_next01();
 
-
-
+// integral cos(phi) * sin(phi) , dphi = [0, pi/2], dtheta = [0, 2pi]
+// CDF = pi/2( 1 - cos(2*phi) ) / pi = sin^2(phi)
+// inverse CDF:   sin(phi) = sqrt(cdf)
+// integral = pi
+// x = sin(phi) cos(theta)
+// y = sin(phi) sin(theta)
+// z = cos(phi) 
+inline Vec3 random_cosine_on_hemisphere() {
+	float r1 = rand_next01(); // about theta
+	float r2 = rand_next01(); // cdf about  phi
+	float z = sqrt(1 - r2);
+	float theta = 2 * PI * r1;
+	float x = cos(theta)*sqrt(r2);
+	float y = sin(theta)*sqrt(r2);
+	return Vec3(x, y, z);
+}

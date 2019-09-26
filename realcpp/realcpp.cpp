@@ -12,6 +12,7 @@
 #include "aabb.h"
 #include "bvh_node.h"
 #include "noise.h"
+#include "pdf.h"
 
 #define STB_IMAGE_IMPLEMENTATION    
 
@@ -38,6 +39,8 @@ Camera camera_origin = Camera(origin, {0,0,1.0f}, { 0,1.0f,0 }, 1.0f, 2.0f);
 
 Camera camera2 = Camera({-4,10,-20}, 
 	{ 13,0,35 }, { 0,1.0f,0 }, 1.0f, 2.0f);
+
+RectLightPdf * light_pdf = nullptr;
 
 Vec3 background(float y) {
 	// ----- sky background
@@ -94,6 +97,66 @@ Vec3 render(Ray &ray,int depth) {
 		if (material->self_luminous)
 			return decay;
 		return decay * render(ray_out, depth + 1);
+	}
+	//render background
+	return background(ray.direction.y());
+}
+
+
+Vec3 render2(Ray &ray, int depth) {
+	// intersect with sphere closest
+	if (depth > 20)
+		return origin; // black
+
+	bool hit = false;
+	Object* p = nullptr;
+
+	HitRecord record;
+	hit = root->hit_test(ray, record);
+
+	if (hit) {
+		//return Vec3(1.0,0.5,0.6);
+
+		//cout << " hit !!! "<< record.hitted << " at "<< record.hit_point << endl;//debug
+		Ray ray_out;
+		Vec3 decay;
+		//Hitable * hitable = (Hitable *)record.hitted;
+		Hitable * hitable = (Hitable *)record.hitted;
+		auto * material = material_map[hitable];
+		
+		if (material->self_luminous) {
+			material->scatter(ray, record, decay, ray_out);
+			return decay;
+		}
+		//auto pdf = LambertianPdf(record.normal);
+		auto pdf1 = LambertianPdf(record.normal);
+		auto pdf = MixedPdf( light_pdf, &pdf1 );
+		//auto & pdf = pdf1;
+
+		ray_out.direction = pdf.random(record);
+		float material_pdf = material->pdf(ray_out, record);
+
+		material->scatter(ray, record, decay, ray_out);
+		float important_sampling_pdf = pdf.probablity(ray_out);
+
+		if (dynamic_cast<Lambertian *>(material) == nullptr) {
+			important_sampling_pdf = 1.0;
+		}
+
+		// debug
+		//cout << "material_pdf: " << material_pdf << " important pdf:" << important_sampling_pdf  << endl;//debug
+		auto ratio = material_pdf / important_sampling_pdf;
+
+		if (isnan(ratio) || isinf(ratio) || ratio > 100 || ratio < 0)
+			return Vec3(0,0,0);
+
+		if (isnan(ratio) || isinf(ratio) || ratio > 1000 || important_sampling_pdf < 0)
+			cout << "material_pdf: " << material_pdf << " important pdf:" << important_sampling_pdf << endl;//debug
+
+		auto returned = render2(ray_out, depth + 1);
+		auto result = decay * returned * ratio;
+		//cout << " result: " << result << " \t ratio:" << ratio << endl;
+		return result;
 	}
 	//render background
 	return background(ray.direction.y());
@@ -247,6 +310,8 @@ void cornel_box() {
 	auto* l = new TranslateObj({ 0, -0.001,5 },
 		new RotateObj(r_x, i_r_x, rect_light));
 
+	auto* l2 = new XZ_Rectangle(-3, 2, 4, 6, 10 - 0.001);
+
 	auto* fl = new TranslateObj({ -10,0,10 },
 		new RotateObj(r_x, i_r_x, rect_floor));
 
@@ -260,7 +325,12 @@ void cornel_box() {
 		new RotateObj( Matrix3::rotation_matrix_y(PI/6), Matrix3::rotation_matrix_y( -PI / 6),
 		new BoxObj({ 2,3,2 })));
 
-	auto* sphere = new Sphere({ 3,2,-1 }, 1.7);
+	auto* box_3 = new TranslateObj({ -4.5,0,3 },
+		new RotateObj(Matrix3::rotation_matrix_y(PI / 5), Matrix3::rotation_matrix_y(-PI / 5),
+			new BoxObj({ 4,7,4 })));
+
+
+	auto* sphere = new Sphere({ 3,2,1.5 }, 1.7);
 
 	objs = {
 		Object( left , mgreen),
@@ -268,21 +338,35 @@ void cornel_box() {
 		Object( right, mred),
 		Object( fl, mgreywhite),
 		Object( cei, mgreywhite),
-		Object( box_1, mgrey),
-		//Object( box_2, mgrey),
-		Object(sphere, glass),
-		Object( l, material_light)
+		//Object( box_1, mgrey),   
+		Object( box_3, gold),
+		Object( sphere, glass),   
+		Object( l2,material_light)
+		//Object( l, material_light)
 	};
+
+	/*objs = {
+		Object(left , mgreen),
+		Object(l2 ,mred)
+	};*/
 
 	cout << " fl  addr " << fl  << endl;
 	cout << " cei addr " << cei << endl;
 	cout << " l   addr " << l   << endl;
+	cout << " l2   addr " << l2 << endl;
+
 
 	cout << " right addr " << right << endl;
 	cout << " left   addr " << left << endl;
 	
 	camera2 = Camera({ 0, 5, -5.5 }, { 0,5,35 }, { 0,1.0f,0 }, 1.0f, 2.0f);
 
+	// far camera
+	//camera2 = Camera({ 0, 15, -25.5 }, { 0,5,35 }, { 0,1.0f,0 }, 1.0f, 2.0f);
+
+	// init light
+	light_pdf = new RectLightPdf(l2);
+	cout << "light area " << light_pdf->area << endl;
 }
 
 void create_box_scene() {
@@ -463,11 +547,20 @@ void work() {
 	for (int h = 0; h < resolution_h; h++) {
 		for (int w = 0; w < resolution_w; w++) {
 
-			//if (w != 700 || h != 375) continue;
-			
+			//if (h != 280 || w != 150) continue;
+
+			// light place
+			//if (h != 300 || w != 167) continue;
+
+			// dark place
+			//if (h != 300 || w != 220) continue;
+
+			//if (h != 60 || w != 300) continue; //ceil
+
+
 			Vec3 color{0,0,0};
-			const int sample_num = 1500*5;
-			//const int sample_num = 20;
+			//const int sample_num = 1500*5;
+			const int sample_num = 200;
 			for (int sample = 0; sample < sample_num; sample ++) {
 				float rh = (h + rand_next()) * 1.0 / resolution_h;
 				float rw = (w + rand_next()) * 1.0 / resolution_w;
@@ -477,10 +570,12 @@ void work() {
 				Ray ray(origin, to);
 				//camera_origin.transformRay(ray);
 				camera2.transformRay(ray);
-				Vec3 colorx = render(ray,0);
+				Vec3 colorx = render2(ray,0);
 				color += colorx;
+				//cout << " colorx " << colorx << endl;
 			}
-			color /= .3 * sample_num;
+			//color /= sample_num;
+			color /= .4 * sample_num;
 
 			//txtout << to.y() << "\t";
 			fout << colorint(color.r()) << " " << colorint(color.g()) << " " << colorint(color.b()) << endl;
@@ -491,6 +586,7 @@ void work() {
 		}
 		//txtout << endl;
 	}
+	fout.close();
 }
 
 int main()

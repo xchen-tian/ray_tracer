@@ -35,6 +35,12 @@ struct Material {
 		auto proj = direction.project_on_unit(normal);
 		return direction - 2 * proj; // return value should be a unit vector 
 	}
+
+	virtual float pdf(const Ray& ray_in,
+		const HitRecord& record) const {
+		return 1.0f; // 
+	}
+
 };
 
 struct Lambertian :public Material {
@@ -47,13 +53,19 @@ struct Lambertian :public Material {
 		Ray& ray_out) const {
 		decay = texture->value(record.u, record.v, Vec3(record.hit_point));
 		ray_out.from = record.hit_point;
-		ray_out.direction = this->random_ray_direction(record.normal);
+		//ray_out.direction = this->random_ray_direction(record.normal);
 	}
 
 	virtual std::ostream& print(std::ostream& o ) const {
 		o << "Lambertian: " << *texture;
 		return o;
 	}
+
+	virtual float pdf(const Ray& ray_in,
+		const HitRecord& record) const {
+		return record.cos_ray_normal;
+	}
+
 
 };
 
@@ -93,10 +105,10 @@ struct Metal :public Material {
 		//cout << " metal reflect " << this->albedo << endl;
 
 		auto direction = this->reflect(ray_in.direction, record.normal);
-		if (this->fuzz > 0) {
-			direction = (1 - fuzz) * direction
-				+ fuzz * this->random_ray_direction(record.normal);
-		}
+		//if (this->fuzz > 0) {
+		//	direction = (1 - fuzz) * direction
+		//		+ fuzz * this->random_ray_direction(record.normal);
+		//}
 		ray_out.direction = direction;
 	}
 

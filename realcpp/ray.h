@@ -9,6 +9,8 @@ struct HitRecord {
 	Vec3 normal;
 	float u, v;
 	void *hitted = nullptr;
+	float cos_ray_normal = -100;
+
 };
 
 
